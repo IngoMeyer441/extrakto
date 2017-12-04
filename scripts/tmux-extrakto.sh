@@ -63,7 +63,7 @@ function capture() {
     $extrakto -r$extrakto_flags | \
     $fzf_tool \
       --header="$header" \
-      --expect=tab,enter,ctrl-e,ctrl-s,ctrl-f,ctrl-l,ctrl-o,esc \
+      --expect=tab,enter,ctrl-e,ctrl-s,ctrl-f,ctrl-l,ctrl-o,ctrl-c,esc \
       --tiebreak=index)
 
   if [ $? -gt 0 ]; then
