@@ -53,6 +53,7 @@ function capture() {
 
   case $extrakto_opt in
     'path/url') extrakto_flags='pu' ;;
+    'lines') extrakto_flags='l' ;;
     *) extrakto_flags='w' ;;
   esac
 
@@ -61,6 +62,7 @@ function capture() {
   # between the commands
   sel=$(tmux capture-pane -pJS ${capture_pane_start} -t ! | \
     $extrakto -r$extrakto_flags | \
+    (read line && (echo $line; cat) || echo NO MATCH - use a different filter) | \
     $fzf_tool \
       --header="$header" \
       --expect=tab,enter,ctrl-e,ctrl-s,ctrl-f,ctrl-l,ctrl-o,ctrl-c,esc \
@@ -92,6 +94,8 @@ function capture() {
     ctrl-f)
       if [[ $extrakto_opt == 'word' ]]; then
         extrakto_opt='path/url'
+      elif [[ $extrakto_opt == 'path/url' ]]; then
+        extrakto_opt='lines'
       else
         extrakto_opt='word'
       fi
