@@ -9,6 +9,7 @@ extrakto="$CURRENT_DIR/../extrakto.py"
 grab_area=$(get_option "@extrakto_grab_area")
 extrakto_opt=$(get_option "@extrakto_default_opt")
 clip_tool=$(get_option "@extrakto_clip_tool")
+clip_tool_run=$(get_option "@extrakto_clip_tool_run")
 fzf_tool=$(get_option "@extrakto_fzf_tool")
 open_tool=$(get_option "@extrakto_open_tool")
 copy_key=$(get_option "@extrakto_copy_key")
@@ -100,8 +101,13 @@ function capture() {
 
     ${copy_key})
       tmux set-buffer -- "$text"
-      # run in background as xclip won't work otherwise
-      tmux run-shell -b "tmux show-buffer|$clip_tool"
+      if [[ "$clip_tool_run" == "fg" ]]; then
+        # run in foreground as OSC-52 copying won't work otherwise
+        tmux run-shell "tmux show-buffer|$clip_tool"
+      else
+        # run in background as xclip won't work otherwise
+        tmux run-shell -b "tmux show-buffer|$clip_tool"
+      fi
       ;;
 
     ${insert_key})
@@ -127,12 +133,25 @@ function capture() {
     ctrl-g)
       # cycle between options like this:
       # recent -> full -> window recent -> window full -> custom (if any) -> recent ...
+      tmux_pane_num=$(tmux list-panes | wc -l)
       if [[ $grab_area == "recent" ]]; then
-          grab_area="window recent"
+          if [[ $tmux_pane_num -eq 2 ]]; then
+              grab_area="full"
+          else
+              grab_area="window recent"
+          fi
       elif [[ $grab_area == "window recent" ]]; then
           grab_area="full"
       elif [[ $grab_area == "full" ]]; then
-          grab_area="window full"
+          if [[ $tmux_pane_num -eq 2 ]]; then
+              grab_area="recent"
+
+              if [[ ! "$original_grab_area" =~ ^(window )?(recent|full)$ ]]; then
+                  grab_area="$original_grab_area"
+              fi
+          else
+              grab_area="window full"
+          fi
       elif [[ $grab_area == "window full" ]]; then
           grab_area="recent"
 
