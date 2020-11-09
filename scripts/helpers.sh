@@ -27,7 +27,7 @@ get_option() {
             ;;
 
         "@extrakto_split_direction")
-            echo $(get_tmux_option $option "v")
+            echo $(get_tmux_option $option "a")
             ;;
 
         "@extrakto_split_size")
@@ -91,4 +91,3 @@ get_capture_pane_start() {
 
     echo "$capture_start"
 }
-
