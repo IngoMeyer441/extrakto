@@ -89,7 +89,7 @@ Where `<option>` and `<value>` are one of the specified here:
 
 | Option                      | Default | Description |
 | :---                        | :---:   | :--- |
-| `@extrakto_key`             | `tab`   | The key binding to start. If you have any special requirements (like a custom key table) set this to '' and define a binding in your `.tmux.conf`. See `extrakto.tmux` for a sample. |
+| `@extrakto_key`             | `tab`   | The key binding to start. If you have any special requirements (like a custom key table) set this to 'none' and define a binding in your `.tmux.conf`. See `extrakto.tmux` for a sample. |
 | `@extrakto_default_opt`     | `word`  | The default extract options (`word`, `lines` or `path/url`) |
 | `@extrakto_split_direction` | `a`     | Whether the tmux split will be `a`uto, `p`opup, `v`ertical or `h`orizontal |
 | `@extrakto_split_size`      | `7`     | The size of the tmux split |
@@ -102,7 +102,7 @@ Where `<option>` and `<value>` are one of the specified here:
 | `@extrakto_insert_key`      | `tab`   | Key to insert selection. |
 | `@extrakto_popup_size`      | `90%`   | Set width and height of the tmux popup window. Set this to `w,h` to set the width to `w` and height to `h`. |
 | `@extrakto_popup_position`  | `C`     | Set position of the tmux popup window. Possible values are in the `display-popup` entry in `man tmux`. Set this to `x,y` to set the x and y positions to `x` and `y` respectively. |
-
+| `@extrakto_fzf_layout`      |`default`| Control the fzf layout which is "bottom-up" by default. If you prefer "top-down" layout instead set this to `reverse`. In fact, this value is passed to the fzf `--layout` parameter. Possible values are: `default`, `reverse` and `reverse-list` |
 
 Example:
 
