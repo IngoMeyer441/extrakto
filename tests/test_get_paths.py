@@ -3,7 +3,9 @@
 
 import unittest
 
-from extrakto import get_paths
+from extrakto import Extrakto
+
+get_paths = Extrakto()["path"].filter
 
 
 class TestGetPaths(unittest.TestCase):

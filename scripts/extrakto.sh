@@ -11,9 +11,10 @@ if ! type mapfile &> /dev/null; then
     exit 1
 fi
 
+PRJ_URL=https://github.com/laktak/extrakto
 current_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 trigger_pane=$1
-mode=$2
+launch_mode=$2
 source "$current_dir/helpers.sh"
 extrakto="$current_dir/../extrakto.py"
 
@@ -31,13 +32,17 @@ declare -Ar COLORS=(
 
 # options; note some of the values can be overwritten by capture()
 grab_area=$(get_option "@extrakto_grab_area")
-extrakto_opt=$(get_option "@extrakto_default_opt")
 clip_tool=$(get_option "@extrakto_clip_tool")
 clip_tool_run=$(get_option "@extrakto_clip_tool_run")
 fzf_tool=$(get_option "@extrakto_fzf_tool")
 open_tool=$(get_option "@extrakto_open_tool")
 copy_key=$(get_option "@extrakto_copy_key")
 insert_key=$(get_option "@extrakto_insert_key")
+filter_key=$(get_option "@extrakto_filter_key")
+open_key=$(get_option "@extrakto_open_key")
+edit_key=$(get_option "@extrakto_edit_key")
+grab_key=$(get_option "@extrakto_grab_key")
+help_key=$(get_option "@extrakto_help_key")
 fzf_layout=$(get_option "@extrakto_fzf_layout")
 
 capture_pane_start=$(get_capture_pane_start "$grab_area")
@@ -71,6 +76,24 @@ else
     editor="$EDITOR"
 fi
 
+copy() {
+    tmux set-buffer -- "$1"
+    if [[ "$clip_tool_run" == "fg" ]]; then
+        # run in foreground as OSC-52 copying won't work otherwise
+        tmux run-shell "tmux show-buffer|$clip_tool"
+    else
+        # run in background as xclip won't work otherwise
+        tmux run-shell -b "tmux show-buffer|$clip_tool"
+    fi
+}
+
+open() {
+    if [[ -n "$open_tool" ]]; then
+        tmux run-shell -b "cd -- $PWD; $open_tool $1"
+        return 0
+    fi
+}
+
 capture_panes() {
     local pane captured
     captured=""
@@ -94,47 +117,55 @@ capture_panes() {
 has_single_pane() {
     local num_panes
     num_panes=$(tmux list-panes | wc -l)
-    if [[ $mode == popup ]]; then
+    if [[ $launch_mode == popup ]]; then
         [[ $num_panes == 1 ]]
     else
         [[ $num_panes == 2 ]]
     fi
 }
 
-capture() {
-    local header_tmpl header extrakto_flags out res key text query
+show_fzf_error() {
+    echo "error: unable to extract - check/report errors above"
+    echo "You can also set the fzf path in options (see readme)."
+    read # pause
+}
 
-    header_tmpl="${COLORS[BOLD]}${insert_key}${COLORS[OFF]}=insert, ${COLORS[BOLD]}${copy_key}${COLORS[OFF]}=copy"
-    [[ -n "$open_tool" ]] && header_tmpl+=", ${COLORS[BOLD]}ctrl-o${COLORS[OFF]}=open"
-    header_tmpl+=", ${COLORS[BOLD]}ctrl-e${COLORS[OFF]}=edit, "
-    header_tmpl+="${COLORS[BOLD]}ctrl-f${COLORS[OFF]}=toggle filter [${COLORS[YELLOW]}${COLORS[BOLD]}:eo:${COLORS[OFF]}], "
-    header_tmpl+="${COLORS[BOLD]}ctrl-g${COLORS[OFF]}=grab area [${COLORS[YELLOW]}${COLORS[BOLD]}:ga:${COLORS[OFF]}]"
+capture() {
+    local mode header_tmpl header out res key text query
+
+    mode=word
+    header_tmpl="${COLORS[BOLD]}${insert_key}${COLORS[OFF]}=insert"
+    header_tmpl+=", ${COLORS[BOLD]}${copy_key}${COLORS[OFF]}=copy"
+    [[ -n "$open_tool" ]] && header_tmpl+=", ${COLORS[BOLD]}${open_key}${COLORS[OFF]}=open"
+    header_tmpl+=", ${COLORS[BOLD]}${edit_key}${COLORS[OFF]}=edit"
+    header_tmpl+=", ${COLORS[BOLD]}${filter_key}${COLORS[OFF]}=filter [${COLORS[YELLOW]}${COLORS[BOLD]}:filter:${COLORS[OFF]}]"
+    header_tmpl+=", ${COLORS[BOLD]}${grab_key}${COLORS[OFF]}=grab area [${COLORS[YELLOW]}${COLORS[BOLD]}:ga:${COLORS[OFF]}]"
+    header_tmpl+=", ${COLORS[BOLD]}${help_key}${COLORS[OFF]}=help"
+
+    get_cap() {
+        if [[ $mode == all ]]; then
+            capture_panes | $extrakto --warn-empty --alt --all --name -r
+        elif [[ $mode == line ]]; then
+            capture_panes | $extrakto --warn-empty -rl
+        else
+            capture_panes | $extrakto --warn-empty -rw
+        fi
+    }
 
     while true; do
-        header="$header_tmpl"
-        header="${header/:eo:/$extrakto_opt}"
-        header="${header/:ga:/$grab_area}"
-
-        case "$extrakto_opt" in
-            'path/url') extrakto_flags='pu' ;;
-            'lines') extrakto_flags='l' ;;
-            *) extrakto_flags='w' ;;
-        esac
+        header=$header_tmpl
+        header=${header/:ga:/$grab_area}
+        header=${header/:filter:/$mode}
 
         # for troubleshooting add
         # tee /tmp/stageN | \
         # between the commands
-        out="$(capture_panes \
-            | $extrakto -r$extrakto_flags \
-            | (read -r line && (
-                echo "$line"
-                cat
-            ) || echo 'NO MATCH - use a different filter') \
+        out="$(get_cap \
             | $fzf_tool \
                 --print-query \
                 --query="$query" \
                 --header="$header" \
-                --expect=${insert_key},${copy_key},ctrl-e,ctrl-f,ctrl-g,ctrl-o,ctrl-c,esc \
+                --expect=${insert_key},${copy_key},${filter_key},${edit_key},${open_key},${grab_key},${help_key},ctrl-c,esc \
                 --tiebreak=index \
                 --layout="$fzf_layout" \
                 --no-info)"
@@ -144,24 +175,18 @@ capture() {
         key="${out[1]}"
         text="${out[-1]}"
 
+        if [[ $mode == all ]]; then
+            text=${text#*: }
+        fi
+
         if [[ $res -gt 0 && -z "$key" ]]; then
-            echo "error: unable to extract - check/report errors above"
-            echo "You can also set the fzf path in options (see readme)."
-            read # pause
+            show_fzf_error
             exit 1
         fi
 
         case "$key" in
             "${copy_key}")
-                tmux set-buffer -- "$text"
-                if [[ "$clip_tool_run" == "fg" ]]; then
-                    # run in foreground as OSC-52 copying won't work otherwise
-                    tmux run-shell "tmux show-buffer|$clip_tool"
-                else
-                    # run in background as xclip won't work otherwise
-                    tmux run-shell -b "tmux show-buffer|$clip_tool"
-                fi
-
+                copy "$text"
                 return 0
                 ;;
 
@@ -171,17 +196,17 @@ capture() {
                 return 0
                 ;;
 
-            ctrl-f)
-                if [[ $extrakto_opt == 'word' ]]; then
-                    extrakto_opt='path/url'
-                elif [[ $extrakto_opt == 'path/url' ]]; then
-                    extrakto_opt='lines'
+            "${filter_key}")
+                if [[ $mode == all ]]; then
+                    mode=line
+                elif [[ $mode == line ]]; then
+                    mode=word
                 else
-                    extrakto_opt='word'
+                    mode=all
                 fi
                 ;;
 
-            ctrl-g)
+            "${grab_key}")
                 # cycle between options like this:
                 # recent -> full -> window recent -> window full -> custom (if any) -> recent ...
                 if [[ $grab_area == "recent" ]]; then
@@ -215,17 +240,28 @@ capture() {
                 capture_pane_start=$(get_capture_pane_start "$grab_area")
                 ;;
 
-            ctrl-o)
-                if [[ -n "$open_tool" ]]; then
-                    tmux run-shell -b "cd -- $PWD; $open_tool $text"
-                    return 0
-                fi
+            "${open_key}")
+                open "$text"
                 ;;
 
-            ctrl-e)
+            "${edit_key}")
                 tmux send-keys -t $trigger_pane "$editor -- $text" 'C-m'
                 return 0
                 ;;
+
+            "${help_key}")
+                clear
+                less -+EF $(realpath "$current_dir/../HELP.md")
+
+                echo -e "\nSince the help page is not 'extrakt'-able:"
+                read -p "Do you wish to [o]pen or [c]opy the GitHub page or [a]bort? [ocA]" -d'' -s -n1 confirm
+                if [[ $confirm == o ]]; then
+                    open $PRJ_URL
+                elif [[ $confirm == c ]]; then
+                    copy $PRJ_URL
+                fi
+                ;;
+
             *)
                 return 0
                 ;;
@@ -233,11 +269,9 @@ capture() {
     done
 }
 
-##############
 # Entry
-##############
 
-if [[ $mode != popup ]]; then
+if [[ $launch_mode != popup ]]; then
     # check terminal size, zoom pane if too small
     lines=$(tput lines)
     if [[ $lines -lt 7 ]]; then

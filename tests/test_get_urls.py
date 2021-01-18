@@ -3,7 +3,9 @@
 
 import unittest
 
-from extrakto import get_urls
+from extrakto import Extrakto
+
+get_urls = Extrakto()["url"].filter
 
 
 class TestGetURLs(unittest.TestCase):

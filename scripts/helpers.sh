@@ -22,10 +22,6 @@ get_option() {
             echo $(get_tmux_option $option "tab")
             ;;
 
-        "@extrakto_default_opt")
-            echo $(get_tmux_option $option "word")
-            ;;
-
         "@extrakto_split_direction")
             echo $(get_tmux_option $option "a")
             ;;
@@ -56,6 +52,26 @@ get_option() {
 
         "@extrakto_insert_key")
             echo $(get_tmux_option $option "tab")
+            ;;
+
+        "@extrakto_filter_key")
+            echo $(get_tmux_option $option "ctrl-f")
+            ;;
+
+        "@extrakto_open_key")
+            echo $(get_tmux_option $option "ctrl-o")
+            ;;
+
+        "@extrakto_edit_key")
+            echo $(get_tmux_option $option "ctrl-e")
+            ;;
+
+        "@extrakto_grab_key")
+            echo $(get_tmux_option $option "ctrl-g")
+            ;;
+
+        "@extrakto_help_key")
+            echo $(get_tmux_option $option "ctrl-h")
             ;;
 
         "@extrakto_clip_tool_run")
